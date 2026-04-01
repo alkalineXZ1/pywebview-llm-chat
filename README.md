@@ -6,11 +6,11 @@ A local desktop AI chat app powered by [Chutes.ai](https://chutes.ai), built wit
 
 ## Screenshots
 
-![Main Chat Window](screen2.png)
+![Main Chat Window](screen2.jpg)
 
-![Full Screen](screen1.png)
+![Full Screen](screen1.jpg)
 
-![Settings](screen3.png)
+![Settings](screen3.jpg)
 ---
 
 ## Features
