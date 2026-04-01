@@ -1,0 +1,10 @@
+openai
+pywebview
+requests
+pypdf
+fpdf2
+pandas
+openpyxl
+python-docx
+python-pptx
+SpeechRecognition
