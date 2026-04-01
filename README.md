@@ -4,6 +4,13 @@ Tailored made for Chutes API
 
 A local desktop AI chat app powered by [Chutes.ai](https://chutes.ai), built with Python and pywebview. Runs entirely on Linux as a single file — no Electron, no browser required.
 
+## Screenshots
+
+![Main Chat Window](screen2.png)
+
+![Full Screen](screen1.png)
+
+![Settings](screen3.png)
 ---
 
 ## Features
