@@ -133,11 +133,7 @@ def delete_chat_file(cid):
     if os.path.exists(p): os.remove(p)
 
 def list_chats():
-    """List all chats with caching for performance.
-    
-    Returns:
-        List of chat metadata dicts, sorted by pinned status then creation date.
-    """
+    """List all chats sorted by pinned status then creation date."""
     chats = []
     try:
         if not os.path.exists(CHATS_DIR):
@@ -417,7 +413,6 @@ pre code{{background:none;padding:0;color:#c8d8e8;font-size:12px}}
         return {"path":tmp,"filename":fn}
     def export_chat_pdf(self, cid):
         """Export chat as PDF (pure Python, no external dependencies)."""
-        tb = traceback
         try:
          c = load_chat(cid)
          if not c: return None
@@ -523,6 +518,7 @@ pre code{{background:none;padding:0;color:#c8d8e8;font-size:12px}}
          write_raw(2, b'<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>')
 
          next_id = 3
+         stream_ids = []
          page_obj_ids = []
 
          for pg_cmds in all_cmds:
@@ -537,25 +533,20 @@ pre code{{background:none;padding:0;color:#c8d8e8;font-size:12px}}
              offsets[sid] = len(buf)
              hdr = f'{sid} 0 obj\n<< /Length {len(stream)} >>\nstream\n'.encode()
              buf += hdr + stream + b'\nendstream\nendobj\n'
-
+             stream_ids.append(sid)
              pid = next_id; next_id += 1
              page_obj_ids.append(pid)
+
+         pages_id = next_id; next_id += 1
+
+         for pid, sid in zip(page_obj_ids, stream_ids):
              write_raw(pid, (
-                 f'<< /Type /Page /Parent {next_id} 0 R ' +
+                 f'<< /Type /Page /Parent {pages_id} 0 R ' +
                  f'/MediaBox [0 0 {PAGE_W} {PAGE_H}] /Contents {sid} 0 R ' +
                  f'/Resources << /Font << /F0 1 0 R /F1 2 0 R >> >> >>').encode())
 
-         pages_id = next_id; next_id += 1
          kids = ' '.join(f'{pid} 0 R' for pid in page_obj_ids)
          write_raw(pages_id, f'<< /Type /Pages /Kids [{kids}] /Count {len(page_obj_ids)} >>'.encode())
-
-         for pid in page_obj_ids:
-             page_idx = page_obj_ids.index(pid)
-             sid_for_page = 3 + page_idx * 2
-             write_raw(pid, (
-                 f'<< /Type /Page /Parent {pages_id} 0 R ' +
-                 f'/MediaBox [0 0 {PAGE_W} {PAGE_H}] /Contents {sid_for_page} 0 R ' +
-                 f'/Resources << /Font << /F0 1 0 R /F1 2 0 R >> >> >>').encode())
 
          catalog_id = next_id; next_id += 1
          write_raw(catalog_id, f'<< /Type /Catalog /Pages {pages_id} 0 R >>'.encode())
@@ -581,7 +572,7 @@ pre code{{background:none;padding:0;color:#c8d8e8;font-size:12px}}
              f.write(bytes(buf))
          return {'path': tmp, 'filename': fn}
         except Exception:
-         tb.print_exc()
+         traceback.print_exc()
          return None
 
     def save_export(self, cid, fmt):
@@ -599,7 +590,6 @@ pre code{{background:none;padding:0;color:#c8d8e8;font-size:12px}}
                 dest = self._window.create_file_dialog(save_type, save_filename=result["filename"])
                 if dest:
                     if isinstance(dest, (list, tuple)): dest = dest[0]
-                    # shutil already imported at top
                     shutil.copy2(result["path"], dest)
                     return str(dest)
             return None
@@ -686,10 +676,9 @@ pre code{{background:none;padding:0;color:#c8d8e8;font-size:12px}}
     def web_search(self, q): return brave_search(q, self.config.get("brave_api_key",""))
     def fetch_url(self, url):
         """Fetch text content from a URL for inline web fetch feature."""
-        if not _requests: return {"error": "requests library not installed."}
+        if not _requests_session: return {"error": "requests library not installed."}
         try:
-            headers = {"User-Agent": "Mozilla/5.0 (compatible; BittensorChat/3.0)"}
-            resp = _requests.get(url, headers=headers, timeout=15)
+            resp = _requests_session.get(url, timeout=15)
             resp.raise_for_status()
             ct = resp.headers.get("content-type","")
             if "html" in ct:
@@ -706,7 +695,6 @@ pre code{{background:none;padding:0;color:#c8d8e8;font-size:12px}}
             return {"error": str(e)}
     def start_voice_record(self):
         """Start recording audio using arecord (Linux/ALSA)."""
-        # tempfile already imported at top
         self._wav_path = os.path.join(tempfile.gettempdir(), "bittensor_voice.wav")
         try:
             self._rec_proc = subprocess.Popen(
@@ -913,7 +901,6 @@ pre code{{background:none;padding:0;color:#c8d8e8;font-size:12px}}
         """Save the active profile, then wipe to guest state."""
         self.save_current_profile()
         self.config.pop('current_profile_id', None)
-        save_config(self.config)
         _wipe_guest_state(self.config)
         save_config(self.config)
         return {'success': True}
@@ -1249,7 +1236,6 @@ body{font-family:'Outfit',sans-serif;background:var(--bg0);color:var(--t1);heigh
 .rt .rt-icon{display:inline-flex;font-size:14px}.rt .ra{transition:transform .2s;display:inline-flex;margin-left:auto}.rt .ra.open{transform:rotate(180deg)}
 .rc{display:none;padding:12px 16px;font-size:13px;color:var(--t3);white-space:pre-wrap;border-top:1px solid rgba(255,255,255,.03);max-height:300px;overflow-y:auto;font-family:'JetBrains Mono',monospace;line-height:1.6}.rc.show{display:block}
 
-.rt .ra{transition:transform .2s;display:inline-flex;margin-left:auto}.rt .ra.open{transform:rotate(180deg)}
 /* Profile button stack for logout below */
 #profile-tb-btn{border-radius:50%;width:36px;height:36px;padding:0}
 .prof-btn-stack{display:flex;flex-direction:column;align-items:center;gap:2px;position:relative}
@@ -1466,8 +1452,6 @@ body{font-family:'Outfit',sans-serif;background:var(--bg0);color:var(--t1);heigh
 .foldr-add-row button{background:var(--ac);color:#000;border:none;border-radius:8px;padding:9px 14px;cursor:pointer;font-weight:700;font-size:13px}
 /* --- Draft badge on chat items --- */
 .ci-draft{width:6px;height:6px;border-radius:50%;background:#f59e0b;flex-shrink:0;display:inline-block;margin-left:2px;vertical-align:middle}
-/* --- Context Window Meter --- */
-
 /* --- Compare mode --- */
 #compare-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:900;flex-direction:column}
 #compare-overlay.show{display:flex}
@@ -1890,7 +1874,7 @@ function showDialog(msg,onOk,showCancel){
 }
 function showAlert(msg){showDialog(msg,null,false)}
 function showConfirm(msg,onOk){showDialog(msg,onOk,true)}
-let cid=null,pf=[],stm=false,rec=null,isRec=false,webS=false,models=[],curM='',selTh='void',lastU=null,maxTk=10000,userScrolled=false,activeStreams=new Set(),streamBuffer={},sessionTokens=0,lastTotalTokens=0,titleOverrides={},chatTokens={};
+let cid=null,pf=[],stm=false,isRec=false,webS=false,models=[],curM='',selTh='void',lastU=null,maxTk=10000,userScrolled=false,activeStreams=new Set(),streamBuffer={},titleOverrides={},chatTokens={};
 let chatDrafts={},activeFolderTab='All',folderColors={},folderList=[],_ctxSel='';
 async function init(){
  const c=await pywebview.api.get_config();window._cfg=c;curM=c.current_model||'';models=c.models||[];maxTk=c.max_tokens||10000;selTh=c.theme||'void';applyTh(selTh);
@@ -1935,7 +1919,7 @@ async function refreshCL(){
   return`<div class="ci ${c.id===cid?'active':''}" onclick="loadChat('${c.id}')" data-tip="${esc(title)}" data-id="${c.id}" draggable="true" ondragstart="onChatDragStart(event,'${c.id}')" ondragend="onChatDragEnd(event)">${c.pinned?`<button class="cip" onclick="event.stopPropagation();togglePin('${c.id}')" title="Unpin">`+I.pin+'</button>':''}${c.branched?'<span class="ci-branch">'+I.branch+'</span>':''}${fdot}<span class="cit">${esc(title)}</span>${draftDot}<span class="cia"><div class="chat-menu"><button onclick="event.stopPropagation();toggleChatMenu('${c.id}')" title="Actions">${I.menu}</button><div class="chat-menu-dropdown" id="cm-${c.id}"><div class="chat-menu-item" onclick="event.stopPropagation();togglePin('${c.id}');hideChatMenu('${c.id}')">${c.pinned?I.pin:I.pinO}<span>${c.pinned?'Unpin':'Pin'}</span></div><div class="chat-menu-item" onclick="event.stopPropagation();renameChat('${c.id}');hideChatMenu('${c.id}')">${I.edit}<span>Rename</span></div><div class="chat-menu-item" onclick="event.stopPropagation();moveChatToFolder('${c.id}');hideChatMenu('${c.id}')"><span class="i i12"><svg viewBox="0 0 24 24"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg></span><span>Move to folder</span></div><div class="chat-menu-item delete" onclick="event.stopPropagation();deleteChat('${c.id}');hideChatMenu('${c.id}')">${I.del}<span>Delete</span></div></div></div></span></div>`
  }).join('')
 }
-async function createNewChat(){const c=await pywebview.api.create_chat();cid=c.id;renderMsgs(c.messages);refreshCL();$('tkb').style.display='none';sessionTokens=0;$('tkb-total').textContent='';$('tkb-inc').textContent=''}
+async function createNewChat(){const c=await pywebview.api.create_chat();cid=c.id;renderMsgs(c.messages);refreshCL();$('tkb').style.display='none';$('tkb-total').textContent='';$('tkb-inc').textContent=''}
 async function loadChat(id){
  if(!id)return;
  // Save draft for current chat before switching
@@ -1960,7 +1944,7 @@ function toggleChatMenu(id){const menu=$(`cm-${id}`);if(!menu)return;const isOpe
 function hideChatMenu(id){const menu=$(`cm-${id}`);if(menu)menu.classList.remove('show');const ci=document.querySelector(`.ci[data-id="${id}"]`);if(ci)ci.classList.remove('menu-open')}
 document.addEventListener('click',function(e){if(!e.target.closest('.chat-menu')){document.querySelectorAll('.chat-menu-dropdown').forEach(m=>m.classList.remove('show'));document.querySelectorAll('.ci.menu-open').forEach(c=>c.classList.remove('menu-open'))}});
 let renameId=null;async function renameChat(id){const c=await pywebview.api.get_chat(id);if(!c)return;renameId=id;$("rnml-input").value=c.title;$("rnml").classList.add("show");$("rnml-input").focus();$("rnml-input").select()}async function saveRename(){const nt=$("rnml-input").value.trim();if(!renameId||!nt)return;const c=await pywebview.api.get_chat(renameId);if(!c||nt===c.title){closeM("rnml");renameId=null;return}await pywebview.api.rename_chat(renameId,nt);refreshCL();if(cid===renameId){const el=document.querySelector(`.ci[data-id="${renameId}"] .cit`);if(el)el.textContent=nt}closeM("rnml");renameId=null}
-function showE(){$('msgs').innerHTML='<div class="es"><h2>What do you want to know?</h2><p>Test my knowledge or pick a chat.</p></div>';$('tkb').style.display='none';sessionTokens=0;$('tkb-total').textContent='';$('tkb-inc').textContent=''}
+function showE(){$('msgs').innerHTML='<div class="es"><h2>What do you want to know?</h2><p>Test my knowledge or pick a chat.</p></div>';$('tkb').style.display='none';$('tkb-total').textContent='';$('tkb-inc').textContent=''}
 function renderMsgs(msgs){
  const a=$('msgs');const f=msgs.filter(m=>m.role!=='system');
  if(!f.length){a.innerHTML='<div class="es"><h2>What do you want to know?</h2><p>Test my knowledge or pick a chat.</p></div>';return}
@@ -2290,7 +2274,7 @@ async function addM(){const inp=$('nmi');const n=inp.value.trim();if(!n)return;m
 async function remM(m){models=await pywebview.api.remove_model(m);if(curM===m&&models.length){curM=models[0];await pywebview.api.set_current_model(curM);$('mname').textContent=short(curM)}renderMD()}
 document.addEventListener('click',e=>{if(!e.target.closest('.ms')){$('mdd').classList.remove('show');$('mbtn').classList.remove('open')}});
 function closeM(id){$(id).classList.remove('show')}
-function openSet(){$('setm').classList.add('show');upTh();const cfg=window._cfg||{}}
+function openSet(){$('setm').classList.add('show');upTh()}
 async function saveSet(){const c={api_key:$('sak').value.trim(),brave_api_key:$('sbk').value.trim(),base_url:$('sbu').value.trim(),max_tokens:parseInt($('smt').value),max_memory:parseInt($('smm').value),theme:selTh};maxTk=c.max_tokens;await pywebview.api.save_settings(c);closeM('setm')}
 
 // Keyboard shortcuts
@@ -2477,8 +2461,7 @@ async function uploadFileForCompare(){
 function openTemplatesForCompare(){_tplForCompare=true;openTemplates();}
 
 // Chat filtering
-let allChats=[];
-async function filterChats(query){const el=$('chatlist');if(!query){refreshCL();return}const chats=await pywebview.api.list_chats();allChats=chats;let filtered=chats.filter(c=>(titleOverrides[c.id]||c.title).toLowerCase().includes(query.toLowerCase()));if(activeFolderTab!=='All')filtered=filtered.filter(c=>c.folder===activeFolderTab);if(!filtered.length){el.innerHTML='<div style="text-align:center;padding:20px;color:var(--t3);font-size:12px">No chats found</div>';return}el.innerHTML=filtered.map(c=>{const title=titleOverrides[c.id]||c.title;const fc=folderColors[c.folder]||'#555566';const fdot=c.folder&&c.folder!=='General'?`<span class="ci-fdot" style="background:${fc}"></span>`:'';return`<div class="ci ${c.id===cid?'active':''}" onclick="loadChat('${c.id}')" data-tip="${esc(title)}" data-id="${c.id}">${c.pinned?`<button class="cip" onclick="event.stopPropagation();togglePin('${c.id}')" title="Unpin">`+I.pin+'</button>':''}${c.branched?'<span class="ci-branch">'+I.branch+'</span>':''}${fdot}<span class="cit">${esc(title)}</span><span class="cia"><div class="chat-menu"><button onclick="event.stopPropagation();toggleChatMenu('${c.id}')" title="Actions">${I.menu}</button><div class="chat-menu-dropdown" id="cm-${c.id}"><div class="chat-menu-item" onclick="event.stopPropagation();togglePin('${c.id}');hideChatMenu('${c.id}')">${c.pinned?I.pin:I.pinO}<span>${c.pinned?'Unpin':'Pin'}</span></div><div class="chat-menu-item" onclick="event.stopPropagation();renameChat('${c.id}');hideChatMenu('${c.id}')">${I.edit}<span>Rename</span></div><div class="chat-menu-item" onclick="event.stopPropagation();moveChatToFolder('${c.id}');hideChatMenu('${c.id}')"><span class="i i12"><svg viewBox="0 0 24 24"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg></span><span>Move to folder</span></div><div class="chat-menu-item delete" onclick="event.stopPropagation();deleteChat('${c.id}');hideChatMenu('${c.id}')">${I.del}<span>Delete</span></div></div></div></span></div>`}).join('')}
+async function filterChats(query){const el=$('chatlist');if(!query){refreshCL();return}const chats=await pywebview.api.list_chats();let filtered=chats.filter(c=>(titleOverrides[c.id]||c.title).toLowerCase().includes(query.toLowerCase()));if(activeFolderTab!=='All')filtered=filtered.filter(c=>c.folder===activeFolderTab);if(!filtered.length){el.innerHTML='<div style="text-align:center;padding:20px;color:var(--t3);font-size:12px">No chats found</div>';return}el.innerHTML=filtered.map(c=>{const title=titleOverrides[c.id]||c.title;const fc=folderColors[c.folder]||'#555566';const fdot=c.folder&&c.folder!=='General'?`<span class="ci-fdot" style="background:${fc}"></span>`:'';return`<div class="ci ${c.id===cid?'active':''}" onclick="loadChat('${c.id}')" data-tip="${esc(title)}" data-id="${c.id}">${c.pinned?`<button class="cip" onclick="event.stopPropagation();togglePin('${c.id}')" title="Unpin">`+I.pin+'</button>':''}${c.branched?'<span class="ci-branch">'+I.branch+'</span>':''}${fdot}<span class="cit">${esc(title)}</span><span class="cia"><div class="chat-menu"><button onclick="event.stopPropagation();toggleChatMenu('${c.id}')" title="Actions">${I.menu}</button><div class="chat-menu-dropdown" id="cm-${c.id}"><div class="chat-menu-item" onclick="event.stopPropagation();togglePin('${c.id}');hideChatMenu('${c.id}')">${c.pinned?I.pin:I.pinO}<span>${c.pinned?'Unpin':'Pin'}</span></div><div class="chat-menu-item" onclick="event.stopPropagation();renameChat('${c.id}');hideChatMenu('${c.id}')">${I.edit}<span>Rename</span></div><div class="chat-menu-item" onclick="event.stopPropagation();moveChatToFolder('${c.id}');hideChatMenu('${c.id}')"><span class="i i12"><svg viewBox="0 0 24 24"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg></span><span>Move to folder</span></div><div class="chat-menu-item delete" onclick="event.stopPropagation();deleteChat('${c.id}');hideChatMenu('${c.id}')">${I.del}<span>Delete</span></div></div></div></span></div>`}).join('')}
 
 // Event listeners for range inputs - set up after DOM ready
 function setupRangeListeners(){const smt=$('smt'),smm=$('smm');if(smt)smt.addEventListener('input',function(){$('smtv').textContent=this.value});if(smm)smm.addEventListener('input',function(){$('smmv').textContent=this.value})}
@@ -2863,7 +2846,6 @@ async function reinitializeApp(){
  // Reset all state
  cid=null;pf=[];stm=false;webS=false;
  activeStreams=new Set();streamBuffer={};
- sessionTokens=0;lastTotalTokens=0;
  titleOverrides={};chatTokens={};chatDrafts={};
  activeFolderTab='All';
  // Clear UI
@@ -2947,7 +2929,6 @@ def _start_e2ee_proxy():
 
     Returns the container ID string on success, or None if Docker is unavailable.
     """
-    import shutil
     if not shutil.which("docker"):
         print("Warning: docker not found, E2EE proxy not started. Falling back to direct API.")
         return None
